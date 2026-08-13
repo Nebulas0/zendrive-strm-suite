@@ -25,7 +25,7 @@ ZenLocalPoller (one per library section)
   v
 strm-pull.service (systemd, every 6h)
   |-- runs rclone sync for each section in parallel (television, movies, xxx, sports, courses)
-  |-- removes stale local files (--max-delete 10000 per section)
+  |-- removes stale local files (--max-delete 50000 per section)
   |-- bounded log (1 GB max)
   |
   v
@@ -528,7 +528,7 @@ ZenLocalPoller configs point at the proxy ports (5582-5588), not the rclone RC p
 | STRM_PULL_SECTIONS | television movies xxx sports courses | Space-separated sections to sync in parallel |
 | STRM_PULL_TRANSFERS | 32 | Per-section rclone transfers |
 | STRM_PULL_CHECKERS | 32 | Per-section rclone checkers |
-| STRM_PULL_MAX_DELETE | 10000 | Per-section max deletions |
+| STRM_PULL_MAX_DELETE | 50000 | Per-section max deletions |
 | STRM_PULL_LOG | /home/plexuser/strm-pull/pull.log | Log file path |
 | MAX_LOG_BYTES | 1073741824 (1 GB) | Log size limit before truncation |
 
@@ -584,11 +584,13 @@ ZenLocalPoller configs point at the proxy ports (5582-5588), not the rclone RC p
 2. `strm-pull.sh` acquires a flock (prevents overlapping runs)
 3. Trims the log to 1 GB if needed
 4. Launches 5 parallel `rclone sync` processes (one per section)
-5. Each section syncs independently with `--fast-list`, `--max-delete 10000`, `--ignore-errors`
-6. Small sections (sports, courses) finish in minutes
-7. Large sections (television, movies) take longer but run in parallel
-8. Waits for all sections, reports per-section OK/FAILED
-9. Returns nonzero if any section failed
+5. Each section syncs independently with `--fast-list`, `--max-delete 50000`, `--ignore-errors`
+6. Excludes local-only directories: `.recyclebin/**`, `.downloads/**`, `.inbound/**`
+7. Each section's log lines are prefixed with `[section]` (e.g. `[movies] INFO ...`)
+8. Small sections (sports, courses) finish in minutes
+9. Large sections (television, movies) take longer but run in parallel
+10. Waits for all sections, reports per-section OK/FAILED
+11. Returns nonzero if any section failed
 
 ### Startup Cache Warmup
 
@@ -611,7 +613,7 @@ Autoscan receives BOTH paths because:
 
 ### Why sync for small dirs and copy for large dirs?
 
-ZenDRIVE's S3 gateway returns duplicate directory entries in LIST responses (both `CommonPrefixes` and zero-byte directory marker `Key` entries). With `rclone sync`, this can cause rclone to see "extra" files, triggering deletions. For small directories (< 500 files), `--max-delete 500` is sufficient. For large directories, `rclone copy` avoids the issue entirely. The full 6-hour sync handles deletions across the whole tree with `--max-delete 10000` per section.
+ZenDRIVE's S3 gateway returns duplicate directory entries in LIST responses (both `CommonPrefixes` and zero-byte directory marker `Key` entries). With `rclone sync`, this can cause rclone to see "extra" files, triggering deletions. For small directories (< 500 files), `--max-delete 500` is sufficient. For large directories, `rclone copy` avoids the issue entirely. The full 6-hour sync handles deletions across the whole tree with `--max-delete 50000` per section.
 
 ### Custom rclone Mount Template
 
