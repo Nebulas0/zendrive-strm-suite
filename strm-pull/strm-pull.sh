@@ -68,7 +68,7 @@ run_sync() {
   mkfifo "$fifo"
 
   # Background: read from FIFO, prefix each line with [label], append to shared log
-  sed -u "s/^/[$label] /" < "$fifo" >> "$LOG" &
+  sed -u "s|^|[$label] |" < "$fifo" >> "$LOG" &
   local sed_pid=$!
 
   # Determine remote and local paths

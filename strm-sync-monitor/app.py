@@ -74,7 +74,7 @@ def tail_log_file():
 
 
 def parse_section_from_line(line):
-    m = re.match(r"^\[([\w/]+)\]", line)
+    m = re.match(r"^\[([\w/-]+)\]", line)
     if m:
         raw = m.group(1)
         # Map split labels like "television/anime" -> "television"
@@ -96,7 +96,7 @@ def get_running_rclone_sections():
             with open(cmdline_path, "r") as f:
                 cmd = f.read().replace("\x00", " ")
             if "rclone sync" in cmd and "zendrive:strm-tree/" in cmd:
-                m = re.search(r"zendrive:strm-tree/([\w/]+)", cmd)
+                m = re.search(r"zendrive:strm-tree/([\w/-]+)", cmd)
                 if m:
                     raw = m.group(1)
                     # Map split paths like "television/anime" -> "television"
@@ -114,12 +114,12 @@ def parse_section_status():
     sections = {}
     started_sections = set()
     for line in lines:
-        start_match = re.match(r"\S+\s+Starting(?: section)?: ([\w/]+)", line)
+        start_match = re.match(r"\S+\s+Starting(?: section)?: ([\w/-]+)", line)
         if start_match:
             raw = start_match.group(1)
             started_sections.add(raw.split("/")[0] if "/" in raw else raw)
-        ok_match = re.match(r"\S+\s+\[([\w/]+)\] (?:Section )?OK", line)
-        fail_match = re.match(r"\S+\s+\[([\w/]+)\] (?:Section )?FAILED", line)
+        ok_match = re.match(r"\S+\s+\[([\w/-]+)\] (?:Section )?OK", line)
+        fail_match = re.match(r"\S+\s+\[([\w/-]+)\] (?:Section )?FAILED", line)
         if ok_match:
             raw = ok_match.group(1)
             sec = raw.split("/")[0] if "/" in raw else raw
@@ -131,9 +131,9 @@ def parse_section_status():
     running_procs = get_running_rclone_sections()
     sync_active = is_sync_running()
     # /proc check is primary - any running process means section is running
+    # This overrides any stale OK/FAILED markers from previous runs
     for sec in running_procs:
-        if sec not in sections or sections[sec]["status"] not in ("ok", "failed"):
-            sections[sec] = {"status": "running"}
+        sections[sec] = {"status": "running"}
     # Sections that were started but not running and not marked OK/FAILED
     for sec in started_sections:
         if sec not in sections:
@@ -521,9 +521,10 @@ function toast(m,s){{
 // SSE: only listen for NEW lines (initial logs already in HTML)
 const es=new EventSource('/api/log/stream');
 es.onmessage=function(e){{
-  const line=e.data;const m=line.match(/^\\[(\\w+)\\]/);
+  const line=e.data;const m=line.match(/^\\[([\\w/-]+)\\]/);
   if(m){{
-    const sec=m[1];const lg=document.getElementById('lg-'+sec);
+    const raw=m[1];const sec=raw.includes('/')?raw.split('/')[0]:raw;
+    const lg=document.getElementById('lg-'+sec);
     if(lg){{
       // Skip duplicate stats lines
       if(isStats(line)&&lg.lastChild&&isStats(lg.lastChild.textContent)){{
