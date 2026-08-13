@@ -33,10 +33,24 @@ fi
 
 echo "$(date -Is) START pull (parallel: $SECTIONS)" >>"$LOG"
 
-# Launch each section in parallel
+# Launch each section in parallel with section-prefixed logging via FIFO
 declare -A SECTION_PIDS
+declare -A SED_PIDS
+declare -A FIFOS
+
 for section in $SECTIONS; do
   echo "$(date -Is) Starting section: $section" >>"$LOG"
+
+  # Create a FIFO for this section's rclone log
+  fifo="/tmp/rclone-log-${section}-$$"
+  mkfifo "$fifo"
+  FIFOS[$section]="$fifo"
+
+  # Background: read from FIFO, prefix each line with [section], append to shared log
+  sed -u "s/^/[$section] /" < "$fifo" >> "$LOG" &
+  SED_PIDS[$section]=$!
+
+  # Background: rclone writes its log to the FIFO
   /usr/bin/rclone sync "zendrive:strm-tree/$section" "$DST/$section" \
     --ignore-size --fast-list \
     --transfers "$TRANSFERS" --checkers "$CHECKERS" \
@@ -50,7 +64,7 @@ for section in $SECTIONS; do
     --exclude ".inbound/**" \
     --retries 3 --low-level-retries 10 \
     --stats 2m --stats-one-line \
-    --log-file "$LOG" --log-level INFO &
+    --log-file "$fifo" --log-level INFO &
   SECTION_PIDS[$section]=$!
 done
 
@@ -59,11 +73,14 @@ FAILED=0
 for section in $SECTIONS; do
   wait ${SECTION_PIDS[$section]}
   RC=$?
+  # Wait for the sed process to finish flushing remaining lines
+  wait ${SED_PIDS[$section]} 2>/dev/null
+  rm -f "${FIFOS[$section]}"
   if [ $RC -ne 0 ]; then
-    echo "$(date -Is) Section $section FAILED (rc=$RC)" >>"$LOG"
+    echo "$(date -Is) [$section] Section FAILED (rc=$RC)" >>"$LOG"
     FAILED=1
   else
-    echo "$(date -Is) Section $section OK" >>"$LOG"
+    echo "$(date -Is) [$section] Section OK" >>"$LOG"
   fi
 done
 
