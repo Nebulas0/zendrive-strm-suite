@@ -1,0 +1,58 @@
+mosquitto:
+  broker: mqtt.clearstreamer.com
+  port: '443'
+  client_id: zenserver-sports-poller
+  username: ${MQTT_USERNAME:-your-mqtt-user}
+  password: ${MQTT_PASSWORD:-changeme}
+  topic: s3
+  qos: 2
+  tls:
+    enabled: true
+mount:
+  path: /mnt/unionfs/sports/
+  inclusions:
+  - /mnt/unionfs/sports/
+  exclusions:
+  - '**/lost+found/**'
+  - '**/*.nfo'
+  - '**/*.jpg'
+rclone:
+  enabled: true
+  host: 127.0.0.1
+  port: '5584'
+  remote: zendrive-sports
+autoscan-servers:
+- host: 127.0.0.1
+  port: 3031
+  username: plexuser
+  password: ${AUTOSCAN_PASSWORD:-changeme}
+  inclusions:
+  - /mnt/unionfs/sports/
+  exclusions:
+  - /mnt/unionfs/downloads/
+  - /mnt/unionfs/transcodes/
+- host: 127.0.0.1
+  port: 3030
+  username: plexuser
+  password: ${AUTOSCAN_PASSWORD:-changeme}
+  inclusions:
+  - /mnt/unionfs/sports/
+  exclusions:
+  - /mnt/unionfs/downloads/
+  - /mnt/unionfs/transcodes/
+  - /mnt/unionfs/.recyclebin/
+  - /mnt/unionfs/.downloads/
+  - /mnt/unionfs/.inbound/
+paths:
+  feeder_paths:
+  - source: /media/zen-ceph/sports/
+    target: /mnt/unionfs/sports/
+database:
+  path: /state/zenlocalpoller-sports.db
+  retention: 72h
+poller:
+  delay: 30s
+  poll-interval: 30s
+  retries: 5
+log:
+  level: info

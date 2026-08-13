@@ -1,0 +1,10 @@
+FROM python:3.12-alpine
+
+RUN apk add --no-cache ca-certificates rclone tzdata
+
+COPY strm-bridge.py /usr/local/bin/strm-bridge.py
+RUN chmod +x /usr/local/bin/strm-bridge.py
+
+WORKDIR /usr/local/bin
+
+ENTRYPOINT ["python3", "/usr/local/bin/strm-bridge.py"]

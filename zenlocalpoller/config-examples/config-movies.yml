@@ -1,0 +1,73 @@
+mosquitto:
+  broker: mqtt.clearstreamer.com
+  port: "443"
+  client_id: zenserver-movies-poller # Unique MQTT client ID for this Saltbox mount.
+  username: ${MQTT_USERNAME:-your-mqtt-user}
+  password: ${MQTT_PASSWORD:-changeme}
+  topic: s3
+  qos: 2
+  tls:
+    enabled: true # Broker is reached over WSS/TLS on port 443.
+
+mount:
+  path: /mnt/unionfs/ # Local mergerfs union path; trailing slash is required.
+  inclusions:
+    - /mnt/unionfs/movies/ # Scope this poller to the matching Saltbox rclone mount.
+  exclusions:
+    - "/mnt/unionfs/{.recyclebin,.downloads,.inbound}/**"
+    - "**/lost+found/**"
+    - "**/*.nfo"
+    - "**/*.jpg"
+
+rclone:
+  enabled: true
+  host: 127.0.0.1
+  port: 5572 # Must match this mount's Saltbox --rc-addr port.
+  remote: zendrive-movies # Saltbox rclone alias mounted for this library.
+
+autoscan-servers:
+  - host: 127.0.0.1
+    port: 3031
+    username: plexuser
+    password: ${AUTOSCAN_PASSWORD:-changeme}
+    inclusions:
+      - /mnt/unionfs/movies/
+    exclusions:
+      - /mnt/unionfs/downloads/
+      - /mnt/unionfs/transcodes/
+      - /mnt/unionfs/.recyclebin/
+      - /mnt/unionfs/.downloads/
+      - /mnt/unionfs/.inbound/
+  - host: 127.0.0.1
+    port: 3030
+    username: plexuser
+    password: ${AUTOSCAN_PASSWORD:-changeme}
+    inclusions:
+      - /mnt/unionfs/movies/
+    exclusions:
+      - /mnt/unionfs/downloads/
+      - /mnt/unionfs/transcodes/
+      - /mnt/unionfs/.recyclebin/
+      - /mnt/unionfs/.downloads/
+      - /mnt/unionfs/.inbound/
+
+paths:
+  feeder_paths:
+    - source: /media/zen-ceph/movies/int/
+      target: /mnt/unionfs/movies-int/
+    - source: /media/zen-ceph/television/int/
+      target: /mnt/unionfs/television-int/
+    - source: /media/zen-ceph/
+      target: /mnt/unionfs/
+
+database:
+  path: /state/zenlocalpoller-movies.db # Separate queue/history per poller instance.
+  retention: 72h
+
+poller:
+  delay: 30s
+  poll-interval: 30s
+  retries: 5
+
+log:
+  level: info

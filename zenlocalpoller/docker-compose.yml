@@ -1,0 +1,137 @@
+services:
+  zenlocalpoller:
+    container_name: zenlocalpoller
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      TZ: ${TZ:-UTC}
+      ZLP_DOWNLOAD_URL: ${ZLP_DOWNLOAD_URL:-https://github.com/datahorders/zenlocalpoller-binaries/releases/latest/download/zenlocalpoller}
+    volumes:
+    - ./config:/config
+    - ./state:/state
+    - ./zenlocalpoller:/usr/local/bin/zenlocalpoller:ro
+  zenlocalpoller-television:
+    container_name: zenlocalpoller-television
+    image: zenlocalpoller-zenlocalpoller
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      TZ: ${TZ:-UTC}
+    volumes:
+    - ./config-television:/config
+    - ./state:/state
+    - ./zenlocalpoller:/usr/local/bin/zenlocalpoller:ro
+  zenlocalpoller-sports:
+    container_name: zenlocalpoller-sports
+    image: zenlocalpoller-zenlocalpoller
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      TZ: ${TZ:-UTC}
+    volumes:
+    - ./config-sports:/config
+    - ./state:/state
+    - ./zenlocalpoller:/usr/local/bin/zenlocalpoller:ro
+  zenlocalpoller-xxx:
+    container_name: zenlocalpoller-xxx
+    image: zenlocalpoller-zenlocalpoller
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      TZ: ${TZ:-UTC}
+    volumes:
+    - ./config-xxx:/config
+    - ./state:/state
+    - ./zenlocalpoller:/usr/local/bin/zenlocalpoller:ro
+  zenlocalpoller-courses:
+    container_name: zenlocalpoller-courses
+    image: zenlocalpoller-zenlocalpoller
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      TZ: ${TZ:-UTC}
+    volumes:
+    - ./config-courses:/config
+    - ./state:/state
+    - ./zenlocalpoller:/usr/local/bin/zenlocalpoller:ro
+  zenlocalpoller-movies-int:
+    container_name: zenlocalpoller-movies-int
+    image: zenlocalpoller-zenlocalpoller
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      TZ: ${TZ:-UTC}
+    volumes:
+    - ./config-movies-int:/config
+    - ./state:/state
+    - ./zenlocalpoller:/usr/local/bin/zenlocalpoller:ro
+  zenlocalpoller-television-int:
+    container_name: zenlocalpoller-television-int
+    image: zenlocalpoller-zenlocalpoller
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      TZ: ${TZ:-UTC}
+    volumes:
+    - ./config-television-int:/config
+    - ./state:/state
+    - ./zenlocalpoller:/usr/local/bin/zenlocalpoller:ro
+  rclone-startup-precache:
+    container_name: rclone-startup-precache
+    build:
+      context: .
+      dockerfile: Dockerfile.rclone-startup-precache
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      TZ: ${TZ:-UTC}
+      START_DELAY_SECONDS: "15"
+      MAX_PARALLEL_REFRESHES: "3"
+      SKIP_IF_CACHED_DIRS: "1000"
+      WATCHDOG_STAGNATION_SECONDS: "600"
+      WATCHDOG_CHECK_INTERVAL_SECONDS: "30"
+      KEEP_ALIVE: "true"
+      MOUNT_SPECS: |-
+        movies:5572:/mnt/remote/zendrive/movies
+        television:5573:/mnt/remote/zendrive/television
+        sports:5574:/mnt/remote/zendrive/sports
+        xxx:5575:/mnt/remote/zendrive/xxx
+        courses:5576:/mnt/remote/zendrive/courses
+        movies-int:5577:/mnt/remote/zendrive/movies-int
+        television-int:5578:/mnt/remote/zendrive/television-int
+    volumes:
+    - /mnt/remote:/mnt/remote:shared
+    - ./state:/state
+  strm-bridge:
+    container_name: strm-bridge
+    build:
+      context: .
+      dockerfile: Dockerfile.strm-bridge
+    restart: unless-stopped
+    network_mode: host
+    user: "1000:1000"
+    environment:
+      TZ: ${TZ:-UTC}
+      HOME: "/home/plexuser"
+      LISTEN_HOST: "127.0.0.1"
+      LISTEN_PORT: "3031"
+      LOCAL_LIBRARY: "/mnt/local/strm/library"
+      RCLONE_REMOTE: "zendrive:strm-tree"
+      AUTOSCAN_URL: "http://127.0.0.1:3030"
+      AUTH_USER: "plexuser"
+      AUTH_PASS: "${STRM_BRIDGE_AUTH_PASS:-changeme}"
+    volumes:
+    - /mnt/local/strm/library:/mnt/local/strm/library
+    - /home/plexuser/.config/rclone:/home/plexuser/.config/rclone:ro
+
+  rclone-rc-proxy:
+    container_name: rclone-rc-proxy
+    image: python:3.12-alpine
+    restart: unless-stopped
+    network_mode: host
+    command: ["python3", "/app/rclone-rc-proxy.py"]
+    volumes:
+    - ./rclone-rc-proxy.py:/app/rclone-rc-proxy.py:ro

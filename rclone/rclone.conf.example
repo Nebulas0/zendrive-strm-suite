@@ -1,0 +1,42 @@
+[zendrive]
+type = s3
+provider = Other
+access_key_id = YOUR_S3_ACCESS_KEY
+secret_access_key = YOUR_S3_SECRET_KEY
+endpoint = https://your-cdn-endpoint.example.com
+acl = private
+force_path_style = true
+
+[zendrive-movies]
+type = alias
+remote = zendrive:movies
+
+[zendrive-television]
+type = alias
+remote = zendrive:television
+
+[zendrive-sports]
+type = alias
+remote = zendrive:sports
+
+[zendrive-xxx]
+type = alias
+remote = zendrive:xxx
+
+[zendrive-courses]
+type = alias
+remote = zendrive:courses
+
+[zendrive-movies-int]
+type = alias
+remote = zendrive:movies/int
+
+[zendrive-television-int]
+type = alias
+remote = zendrive:television/int
+
+[rs80]
+shell_type = unix
+md5sum_command = md5sum
+sha1sum_command = sha1sum
+

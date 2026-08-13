@@ -1,0 +1,14 @@
+[Unit]
+Description=Pull strm-tree projection from CDN into strm library
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=plexuser
+Group=plexuser
+ExecStart=/home/plexuser/strm-pull/strm-pull.sh
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=6
+TimeoutStartSec=20h

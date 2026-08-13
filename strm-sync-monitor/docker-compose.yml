@@ -1,0 +1,44 @@
+services:
+  strm-sync-monitor:
+    container_name: strm-sync-monitor
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    privileged: true
+    pid: host
+    environment:
+      TZ: ${TZ:-UTC}
+      LOG_FILE: "/app/pull.log"
+      LOCK_FILE: "/tmp/strm-pull.lock"
+      START_SCRIPT: "/app/start-sync.sh"
+      STOP_SCRIPT: "/app/stop-sync.sh"
+    volumes:
+      - /home/plexuser/strm-pull/pull.log:/app/pull.log
+      - /home/plexuser/strm-pull/start-sync.sh:/app/start-sync.sh:ro
+      - /home/plexuser/strm-pull/stop-sync.sh:/app/stop-sync.sh:ro
+      - /tmp/strm-pull.lock:/tmp/strm-pull.lock
+    networks:
+      - saltbox
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.strm-sync-http.entrypoints=web"
+      - "traefik.http.routers.strm-sync-http.middlewares=globalHeaders@file,redirect-to-https@docker,robotHeaders@file,authelia@docker"
+      - "traefik.http.routers.strm-sync-http.priority=20"
+      - "traefik.http.routers.strm-sync-http.rule=Host(`strm-sync.example.com`)"
+      - "traefik.http.routers.strm-sync-http.service=strm-sync-http"
+      - "traefik.http.routers.strm-sync.entrypoints=websecure"
+      - "traefik.http.routers.strm-sync.middlewares=globalHeaders@file,secureHeaders@file,robotHeaders@file,authelia@docker"
+      - "traefik.http.routers.strm-sync.priority=20"
+      - "traefik.http.routers.strm-sync.rule=Host(`strm-sync.example.com`)"
+      - "traefik.http.routers.strm-sync.service=strm-sync"
+      - "traefik.http.routers.strm-sync.tls.certresolver=cfdns"
+      - "traefik.http.routers.strm-sync.tls.domains[0].main=example.com"
+      - "traefik.http.routers.strm-sync.tls.domains[0].sans=*.example.com"
+      - "traefik.http.routers.strm-sync.tls.options=securetls@file"
+      - "traefik.http.services.strm-sync-http.loadbalancer.server.port=8080"
+      - "traefik.http.services.strm-sync.loadbalancer.server.port=8080"
+
+networks:
+  saltbox:
+    external: true

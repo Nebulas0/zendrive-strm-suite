@@ -1,0 +1,8 @@
+FROM alpine:3.20
+
+RUN apk add --no-cache coreutils findutils wget tzdata
+
+COPY rclone-startup-precache.sh /usr/local/bin/rclone-startup-precache
+RUN chmod +x /usr/local/bin/rclone-startup-precache
+
+ENTRYPOINT ["/usr/local/bin/rclone-startup-precache"]

@@ -1,0 +1,14 @@
+# Secrets - never commit real credentials
+.env
+*.secret
+rclone.conf
+
+# State and databases
+state/
+*.db
+*.db.bak*
+*.log
+
+# Backups
+*.bak*
+*.bak-*
