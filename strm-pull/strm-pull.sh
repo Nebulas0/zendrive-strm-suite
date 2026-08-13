@@ -11,7 +11,7 @@ SECTIONS="${STRM_PULL_SECTIONS:-television movies xxx sports courses}"
 # Per-section rclone settings
 TRANSFERS="${STRM_PULL_TRANSFERS:-32}"
 CHECKERS="${STRM_PULL_CHECKERS:-32}"
-MAX_DELETE="${STRM_PULL_MAX_DELETE:-10000}"
+MAX_DELETE="${STRM_PULL_MAX_DELETE:-50000}"
 
 exec 9>"$LOCK"
 if ! flock -n 9; then
@@ -45,6 +45,9 @@ for section in $SECTIONS; do
     --ignore-errors \
     --exclude "*.partial" \
     --exclude "*.partial.*" \
+    --exclude ".recyclebin/**" \
+    --exclude ".downloads/**" \
+    --exclude ".inbound/**" \
     --retries 3 --low-level-retries 10 \
     --stats 2m --stats-one-line \
     --log-file "$LOG" --log-level INFO &
