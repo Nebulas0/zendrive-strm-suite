@@ -97,10 +97,13 @@ run_sync() {
   wait "$sed_pid" 2>/dev/null
   rm -f "$fifo"
 
-  if [ $rc -ne 0 ]; then
-    echo "$(date -Is) [$label] FAILED (rc=$rc)" >>"$LOG"
-  else
+  if [ $rc -eq 0 ]; then
     echo "$(date -Is) [$label] OK" >>"$LOG"
+  elif [ $rc -eq 4 ]; then
+    # rc=4 = completed with errors (some files failed, but sync finished)
+    echo "$(date -Is) [$label] OK (with errors, rc=$rc)" >>"$LOG"
+  else
+    echo "$(date -Is) [$label] FAILED (rc=$rc)" >>"$LOG"
   fi
 
   return $rc
@@ -119,7 +122,7 @@ for job in "${JOBS[@]}"; do
     rc=$?
     RUNNING=$((RUNNING - 1))
     COMPLETED=$((COMPLETED + 1))
-    if [ $rc -ne 0 ]; then
+    if [ $rc -ne 0 ] && [ $rc -ne 4 ]; then
       FAILED=1
     fi
   done

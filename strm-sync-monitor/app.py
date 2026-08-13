@@ -118,9 +118,14 @@ def parse_section_status():
         if start_match:
             raw = start_match.group(1)
             started_sections.add(raw.split("/")[0] if "/" in raw else raw)
-        ok_match = re.match(r"\S+\s+\[([\w/-]+)\] (?:Section )?OK", line)
+        ok_match = re.match(r"\S+\s+\[([\w/-]+)\] (?:Section )?OK(?:\s*\(with errors.*)?", line)
+        ok_errors_match = re.match(r"\S+\s+\[([\w/-]+)\] (?:Section )?OK\s*\(with errors", line)
         fail_match = re.match(r"\S+\s+\[([\w/-]+)\] (?:Section )?FAILED", line)
-        if ok_match:
+        if ok_errors_match:
+            raw = ok_errors_match.group(1)
+            sec = raw.split("/")[0] if "/" in raw else raw
+            sections[sec] = {"status": "partial"}
+        elif ok_match:
             raw = ok_match.group(1)
             sec = raw.split("/")[0] if "/" in raw else raw
             sections[sec] = {"status": "ok"}
@@ -315,6 +320,7 @@ def index():
             "running": ("Running", "st-running"),
             "ok": ("Done", "st-done"),
             "done": ("Done", "st-done"),
+            "partial": ("Done (errors)", "st-partial"),
             "failed": ("Failed", "st-failed"),
             "idle": ("Idle", "st-idle"),
         }
@@ -346,7 +352,7 @@ def index():
             log_html += f'<div class="ll {cls}">{esc}</div>'
         if not log_html:
             log_html = '<div class="ll ll-empty">No output yet</div>'
-        expanded = status in ("running", "failed")
+        expanded = status in ("running", "failed", "partial")
         style = "" if expanded else "display:none;"
         chev = "open" if expanded else ""
         panels_html += f'''
@@ -417,6 +423,7 @@ body{{font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-serif
 .sec-card:hover{{box-shadow:0 4px 12px rgba(0,0,0,0.08);transform:translateY(-1px)}}
 .sec-card.st-running{{box-shadow:0 0 0 2px var(--yellow),0 4px 12px rgba(202,138,4,0.15)}}
 .sec-card.st-failed{{box-shadow:0 0 0 2px var(--red),0 4px 12px rgba(220,38,38,0.1)}}
+.sec-card.st-partial{{box-shadow:0 0 0 2px #ea580c,0 4px 12px rgba(234,88,12,0.12)}}
 .sec-top{{display:flex;align-items:center;gap:8px;margin-bottom:10px}}
 .sec-dot{{width:10px;height:10px;border-radius:50%;flex-shrink:0}}
 .sec-name{{font-size:0.88rem;font-weight:700;flex:1}}
@@ -424,6 +431,7 @@ body{{font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-serif
 .st-running{{background:#fef3c7;color:var(--yellow)}}
 .st-done{{background:#dcfce7;color:var(--green)}}
 .st-failed{{background:#fee2e2;color:var(--red)}}
+.st-partial{{background:#fef3c7;color:#ea580c}}
 .st-idle{{background:#f1f5f9;color:var(--dim)}}
 .sec-stats{{display:flex;gap:12px;font-size:0.72rem;color:var(--dim)}}
 .sec-stats .s-stat b{{color:var(--text)}}
