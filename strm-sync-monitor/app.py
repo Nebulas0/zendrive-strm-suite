@@ -74,9 +74,13 @@ def tail_log_file():
 
 
 def parse_section_from_line(line):
-    m = re.match(r"^\[(\w+)\]", line)
+    m = re.match(r"^\[([\w/]+)\]", line)
     if m:
-        return m.group(1)
+        raw = m.group(1)
+        # Map split labels like "television/anime" -> "television"
+        if "/" in raw:
+            return raw.split("/")[0]
+        return raw
     return None
 
 
@@ -92,9 +96,14 @@ def get_running_rclone_sections():
             with open(cmdline_path, "r") as f:
                 cmd = f.read().replace("\x00", " ")
             if "rclone sync" in cmd and "zendrive:strm-tree/" in cmd:
-                m = re.search(r"zendrive:strm-tree/(\w+)", cmd)
+                m = re.search(r"zendrive:strm-tree/([\w/]+)", cmd)
                 if m:
-                    running.add(m.group(1))
+                    raw = m.group(1)
+                    # Map split paths like "television/anime" -> "television"
+                    if "/" in raw:
+                        running.add(raw.split("/")[0])
+                    else:
+                        running.add(raw)
         except (IOError, OSError):
             continue
     return running
@@ -105,15 +114,20 @@ def parse_section_status():
     sections = {}
     started_sections = set()
     for line in lines:
-        start_match = re.match(r"\S+\s+Starting section: (\w+)", line)
+        start_match = re.match(r"\S+\s+Starting(?: section)?: ([\w/]+)", line)
         if start_match:
-            started_sections.add(start_match.group(1))
-        ok_match = re.match(r"\S+\s+\[(\w+)\] Section OK", line)
-        fail_match = re.match(r"\S+\s+\[(\w+)\] Section FAILED", line)
+            raw = start_match.group(1)
+            started_sections.add(raw.split("/")[0] if "/" in raw else raw)
+        ok_match = re.match(r"\S+\s+\[([\w/]+)\] (?:Section )?OK", line)
+        fail_match = re.match(r"\S+\s+\[([\w/]+)\] (?:Section )?FAILED", line)
         if ok_match:
-            sections[ok_match.group(1)] = {"status": "ok"}
+            raw = ok_match.group(1)
+            sec = raw.split("/")[0] if "/" in raw else raw
+            sections[sec] = {"status": "ok"}
         elif fail_match:
-            sections[fail_match.group(1)] = {"status": "failed"}
+            raw = fail_match.group(1)
+            sec = raw.split("/")[0] if "/" in raw else raw
+            sections[sec] = {"status": "failed"}
     running_procs = get_running_rclone_sections()
     sync_active = is_sync_running()
     # /proc check is primary - any running process means section is running
