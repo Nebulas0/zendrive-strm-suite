@@ -1,0 +1,98 @@
+# Saltbox rclone Settings
+# Copy the remotes section into /srv/git/saltbox/settings.yml under "rclone:"
+# Each remote uses the custom scan-optimized template (generic-scan.j2)
+
+rclone:
+  version: latest
+  enabled: yes
+  remotes:
+    - remote: zendrive-movies
+      settings:
+        mount: yes
+        template: /opt/mount-templates/custom/generic-scan.j2
+        union: no
+        upload: no
+        upload_from: /mnt/local/Media
+        vfs_cache:
+          enabled: yes
+          max_age: 72h
+          size: 150G
+          version: latest
+
+    - remote: zendrive-television
+      settings:
+        mount: yes
+        template: /opt/mount-templates/custom/generic-scan.j2
+        union: no
+        upload: no
+        upload_from: /mnt/local/Media
+        vfs_cache:
+          enabled: yes
+          max_age: 72h
+          size: 100G
+          version: latest
+
+    - remote: zendrive-sports
+      settings:
+        mount: yes
+        template: /opt/mount-templates/custom/generic-scan.j2
+        union: no
+        upload: no
+        upload_from: /mnt/local/Media
+        vfs_cache:
+          enabled: yes
+          max_age: 72h
+          size: 20G
+          version: latest
+
+    - remote: zendrive-xxx
+      settings:
+        mount: yes
+        template: /opt/mount-templates/custom/generic-scan.j2
+        union: no
+        upload: no
+        upload_from: /mnt/local/Media
+        vfs_cache:
+          enabled: yes
+          max_age: 72h
+          size: 10G
+          version: latest
+
+    - remote: zendrive-courses
+      settings:
+        mount: yes
+        template: /opt/mount-templates/custom/generic-scan.j2
+        union: yes
+        upload: no
+        upload_from: /mnt/local/Media
+        vfs_cache:
+          enabled: yes
+          max_age: 72h
+          size: 10G
+          version: latest
+
+    - remote: zendrive-movies-int
+      settings:
+        mount: yes
+        template: /opt/mount-templates/custom/generic-scan.j2
+        union: no
+        upload: no
+        upload_from: /mnt/local/Media
+        vfs_cache:
+          enabled: yes
+          max_age: 72h
+          size: 50G
+          version: latest
+
+    - remote: zendrive-television-int
+      settings:
+        mount: yes
+        template: /opt/mount-templates/custom/generic-scan.j2
+        union: no
+        upload: no
+        upload_from: /mnt/local/Media
+        vfs_cache:
+          enabled: yes
+          max_age: 72h
+          size: 50G
+          version: latest

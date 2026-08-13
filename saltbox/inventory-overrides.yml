@@ -1,0 +1,35 @@
+# Saltbox Inventory Overrides
+# Copy these into /srv/git/saltbox/inventories/host_vars/localhost.yml
+# Edit with: sb edit inventory
+
+# Custom mount branch for ZenDRIVE (NC = No Cloudplow)
+custom_mount_branch: "/mnt/remote/zendrive=NC"
+
+# Emby instance named "clean" (Saltbox supports multiple instances)
+# If you use the default "emby" instance, change "clean" to "emby" everywhere
+emby_instances: ["clean"]
+clean_docker_image_repo: "lscr.io/linuxserver/emby"
+clean_docker_image_tag: "version-4.9.5.0"
+
+# Emby: LSIO Docker mod that swaps in darthShadow tuned libsqlite3.so at container startup
+# This significantly improves scan performance on large libraries
+clean_docker_envs_custom:
+  DOCKER_MODS: "ghcr.io/darthshadow/linuxserver-mod-sqlite3-emby:2026.07.20-r2"
+
+# Emby: Increase DB connections and cache for better scan performance
+# These are written to /opt/clean/config/config/system.xml
+clean_config_settings_custom:
+  - xpath: 'MaxLibraryDatabaseConnections'
+    value: '20'
+  - xpath: 'MaxAuthDbConnections'
+    value: '10'
+  - xpath: 'MaxOtherDbConnections'
+    value: '10'
+  - xpath: 'DatabaseCacheSizeMB'
+    value: '192'
+  - xpath: 'EnableSqLiteMmio'
+    value: 'true'
+
+# Autoscan: bind to localhost only (strm-bridge and ZenLocalPoller are on host network)
+autoscan_role_docker_ports:
+  - "127.0.0.1:3030:3030"

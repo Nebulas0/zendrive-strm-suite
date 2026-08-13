@@ -1,0 +1,67 @@
+# /etc/systemd/system/{{ _service_file }}
+# ClearStreamer S3 scan profile (optimized for fast scans + streaming)
+
+{% set category_name = rclone_remote_name | regex_replace('^zendrive-', '') %}
+{% set mount_target = '/mnt/remote/zendrive/' + category_name %}
+
+[Unit]
+Description=Rclone ClearStreamer Scan Profile
+After=network-online.target
+
+[Service]
+User={{ user.name }}
+Group={{ user.name }}
+Type=notify
+ExecStartPre=/bin/mkdir -p "{{ mount_target }}"
+ExecStart=/usr/bin/rclone mount \
+    --allow-other \
+{% if (rclone_vfs_cache_dir_lookup | length > 0) and item.settings.vfs_cache.enabled %}
+    --cache-dir={{ rclone_vfs_cache_dir_lookup }} \
+{% endif %}
+    --config={{ rclone_config_path }} \
+    --read-only \
+    --exclude="**/.ignore" \
+    --use-server-modtime \
+    --no-checksum \
+    --s3-no-check-bucket \
+    --s3-disable-checksum \
+    --s3-no-head \
+    --checkers 16 \
+    --transfers 16 \
+    --bwlimit 119M \
+    --dir-cache-time 9999h \
+    --fast-list \
+    --poll-interval 0 \
+    --no-modtime \
+    --rc \
+    --rc-addr 127.0.0.1:{{ rclone_remote_port }} \
+    --rc-no-auth \
+{% if item.settings.vfs_cache.enabled %}
+    --vfs-cache-min-free-space={{ rclone_vfs_cache_min_free_space }} \
+    --vfs-cache-mode full \
+    --vfs-cache-max-size {{ item.settings.vfs_cache.size | default('300G') }} \
+    --vfs-cache-max-age {{ item.settings.vfs_cache.max_age | default('72h') }} \
+    --vfs-cache-poll-interval 10s \
+    --vfs-fast-fingerprint \
+{% else %}
+    --vfs-cache-mode off \
+{% endif %}
+    --buffer-size 32M \
+    --vfs-read-ahead 128M \
+    --vfs-read-chunk-size 4M \
+    --vfs-read-chunk-streams 0 \
+    --vfs-read-chunk-size-limit 2G \
+    -v \
+    "{{ rclone_remote_with_path }}" "{{ mount_target }}"
+ExecStartPost=/bin/true
+ExecStop=/bin/fusermount3 -uz "{{ mount_target }}"
+ExecStopPost=/bin/umount -l "{{ mount_target }}"
+TimeoutStopSec=20
+KillMode=mixed
+Restart=on-failure
+RestartSec=30
+StartLimitBurst=5
+StartLimitIntervalSec=300
+
+[Install]
+WantedBy=default.target
