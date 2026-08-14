@@ -120,7 +120,7 @@ zendrive-strm-suite/
 │
 ├── systemd/                           # systemd unit files
 │   ├── strm-pull.service              # One-shot service that runs strm-pull.sh
-│   └── strm-pull.timer                # Triggers every 6h + on boot
+│   └── strm-pull.timer                # Triggers every 2.5h + on boot
 │
 ├── autoscan/                          # Autoscan configuration
 │   └── config.yml                     # Autoscan webhook + Emby target config
@@ -537,7 +537,7 @@ ZenLocalPoller configs point at the proxy ports (5582-5588), not the rclone RC p
 | Setting | Value | Description |
 |---------|-------|-------------|
 | OnBootSec | 20min | First run 20 min after boot |
-| OnUnitInactiveSec | 6h | Then every 6 hours after last run finishes |
+| OnUnitInactiveSec | 2h30m | Then every 2.5 hours after last run finishes |
 | Persistent | true | Catch up on missed runs after reboot |
 | RandomizedDelaySec | 10min | Random delay to avoid spikes |
 

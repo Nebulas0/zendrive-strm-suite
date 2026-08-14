@@ -138,7 +138,7 @@ while [ "$RUNNING" -gt 0 ]; do
   rc=$?
   RUNNING=$((RUNNING - 1))
   COMPLETED=$((COMPLETED + 1))
-  if [ $rc -ne 0 ]; then
+  if [ $rc -ne 0 ] && [ $rc -ne 4 ]; then
     FAILED=1
   fi
 done

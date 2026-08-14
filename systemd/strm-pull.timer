@@ -3,7 +3,7 @@ Description=Periodic strm-tree pull into strm
 
 [Timer]
 OnBootSec=20min
-OnUnitInactiveSec=4h
+OnUnitInactiveSec=2h30m
 Persistent=true
 RandomizedDelaySec=10min
 
