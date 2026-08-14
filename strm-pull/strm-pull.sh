@@ -144,3 +144,4 @@ while [ "$RUNNING" -gt 0 ]; do
 done
 
 echo "$(date -Is) END pull rc=$FAILED dur=$(( $(date +%s) - START ))s jobs=$TOTAL_JOBS" >>"$LOG"
+exit $FAILED
