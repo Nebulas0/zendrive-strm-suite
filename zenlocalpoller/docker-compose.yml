@@ -94,6 +94,7 @@ services:
       WATCHDOG_STAGNATION_SECONDS: "600"
       WATCHDOG_CHECK_INTERVAL_SECONDS: "30"
       KEEP_ALIVE: "true"
+      REFRESH_INTERVAL_SECONDS: "9000"  # 2.5h, matches strm-pull timer
       MOUNT_SPECS: |-
         movies:5572:/mnt/remote/zendrive/movies
         television:5573:/mnt/remote/zendrive/television
@@ -122,7 +123,7 @@ services:
       RCLONE_REMOTE: "zendrive:strm-tree"
       AUTOSCAN_URL: "http://127.0.0.1:3030"
       AUTH_USER: "plexuser"
-      AUTH_PASS: "${STRM_BRIDGE_AUTH_PASS:-changeme}"
+      AUTH_PASS: "8XpETOmC6JyKXeNZ"
     volumes:
     - /mnt/local/strm/library:/mnt/local/strm/library
     - /home/plexuser/.config/rclone:/home/plexuser/.config/rclone:ro

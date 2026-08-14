@@ -9,6 +9,7 @@ set -eu
 : "${WATCHDOG_STAGNATION_SECONDS:=600}"
 : "${WATCHDOG_CHECK_INTERVAL_SECONDS:=30}"
 : "${KEEP_ALIVE:=true}"
+: "${REFRESH_INTERVAL_SECONDS:=0}"  # 0 = run once; >0 = loop forever
 : "${MOUNT_SPECS:=movies:5572:/mnt/remote/zendrive/movies
 television:5573:/mnt/remote/zendrive/television
 sports:5574:/mnt/remote/zendrive/sports
@@ -410,7 +411,21 @@ done
 overall_elapsed=$(($(date +%s) - overall_start))
 log "status=all-done elapsed=${overall_elapsed}s"
 
-if [ "$KEEP_ALIVE" = "true" ]; then
+if [ "$KEEP_ALIVE" = "true" ] && [ "$REFRESH_INTERVAL_SECONDS" -gt 0 ]; then
+  log "status=loop-mode interval=${REFRESH_INTERVAL_SECONDS}s"
+  while true; do
+    log "status=sleeping interval=${REFRESH_INTERVAL_SECONDS}s"
+    sleep "$REFRESH_INTERVAL_SECONDS"
+    log "status=periodic-refresh starting"
+    cycle_start="$(date +%s)"
+    printf '%s\n' "$MOUNT_SPECS" | while IFS=: read -r name port path; do
+      [ -n "$name" ] || continue
+      warm_mount "$name" "$port" "$path" || true
+    done
+    cycle_elapsed=$(($(date +%s) - cycle_start))
+    log "status=periodic-refresh-done elapsed=${cycle_elapsed}s"
+  done
+elif [ "$KEEP_ALIVE" = "true" ]; then
   log "status=idle message=\"pre-cache finished; restart this container to run it again\""
   tail -f /dev/null
 fi
