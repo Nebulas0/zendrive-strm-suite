@@ -18,7 +18,52 @@ LOG_FILE = os.environ.get("LOG_FILE", "/app/pull.log")
 LOCK_FILE = os.environ.get("LOCK_FILE", "/tmp/strm-pull.lock")
 START_SCRIPT = os.environ.get("START_SCRIPT", "/app/start-sync.sh")
 STOP_SCRIPT = os.environ.get("STOP_SCRIPT", "/app/stop-sync.sh")
-SYNC_INTERVAL_HOURS = 6
+SYNC_INTERVAL_HOURS = 2.5  # fallback if systemd timer can't be read
+
+def get_sync_interval_hours():
+    """Try to read OnUnitInactiveSec from the live systemd timer."""
+    try:
+        import subprocess as _sp
+        result = _sp.run(
+            ["nsenter", "-t", "1", "-m", "-u", "-i", "-n", "--", "/usr/bin/systemctl", "show", "strm-pull.timer", "-p", "OnUnitInactiveSec"],
+            capture_output=True, text=True, timeout=5
+        )
+        # Output looks like: OnUnitInactiveSec=2h30min
+        line = result.stdout.strip()
+        if "=" in line:
+            val = line.split("=", 1)[1].strip()
+            return parse_systemd_duration(val)
+    except Exception:
+        pass
+    return SYNC_INTERVAL_HOURS
+
+def parse_systemd_duration(val):
+    """Parse systemd duration like '2h30min', '4h', '90s', '1h30m' into hours (float)."""
+    import re
+    total_seconds = 0
+    # Match patterns like 2h, 30min, 30m, 90s, 1d, 5ms, 1us
+    for match in re.finditer(r'(\d+)\s*(ms|us|s|min|m|h|d|w|month|months|y)', val):
+        num = int(match.group(1))
+        unit = match.group(2)
+        if unit == 'ms':
+            total_seconds += num / 1000
+        elif unit == 'us':
+            total_seconds += num / 1000000
+        elif unit == 's':
+            total_seconds += num
+        elif unit in ('min', 'm'):
+            total_seconds += num * 60
+        elif unit == 'h':
+            total_seconds += num * 3600
+        elif unit == 'd':
+            total_seconds += num * 86400
+        elif unit == 'w':
+            total_seconds += num * 604800
+        elif unit in ('month', 'months'):
+            total_seconds += num * 2592000
+        elif unit == 'y':
+            total_seconds += num * 31536000
+    return total_seconds / 3600 if total_seconds > 0 else SYNC_INTERVAL_HOURS
 TAIL_LINES = 20000
 
 KNOWN_SECTIONS = ["television", "movies", "xxx", "sports", "courses"]
@@ -387,8 +432,9 @@ def index():
     if history and history[0].get("end"):
         try:
             from datetime import datetime, timedelta
+            interval = get_sync_interval_hours()
             last_end = datetime.fromisoformat(history[0]["end"])
-            next_dt = last_end + timedelta(hours=SYNC_INTERVAL_HOURS)
+            next_dt = last_end + timedelta(hours=interval)
             next_run = next_dt.strftime("%Y-%m-%d %H:%M")
         except Exception:
             pass
