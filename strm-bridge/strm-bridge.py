@@ -37,7 +37,7 @@ LOCAL_LIBRARY = os.environ.get("LOCAL_LIBRARY", "/mnt/local/strm/library")
 RCLONE_REMOTE = os.environ.get("RCLONE_REMOTE", "zendrive:strm-tree")
 AUTOSCAN_URL = os.environ.get("AUTOSCAN_URL", "http://127.0.0.1:3030")
 AUTH_USER = os.environ.get("AUTH_USER", "plexuser")
-AUTH_PASS = os.environ.get("AUTH_PASS", "changeme")
+AUTH_PASS = os.environ.get("AUTH_PASS", "8XpETOmC6JyKXeNZ")
 RCLONE_TRANSFERS = os.environ.get("RCLONE_TRANSFERS", "8")
 RCLONE_CHECKERS = os.environ.get("RCLONE_CHECKERS", "8")
 
@@ -309,6 +309,11 @@ class BridgeHandler(BaseHTTPRequestHandler):
             data = {"path": parsed.get("path", [""])[0]}
 
         path = data.get("path", "")
+        # If path is just a bare filename (not a full unionfs path), try
+        # extracting the full path from series/episodeFile or movie/movieFile
+        if path and not path.startswith("/mnt/unionfs/"):
+            log.info(f"Path '{path}' is not a unionfs path, trying movie/series fields")
+            path = ""
         if not path:
             if "series" in data:
                 base = data["series"].get("path", "")
@@ -318,13 +323,20 @@ class BridgeHandler(BaseHTTPRequestHandler):
                 base = data["movie"].get("path", "")
                 rel = data.get("movieFile", {}).get("relativePath", "")
                 path = os.path.join(base, rel) if rel else base
+            elif "remotePath" in data:
+                path = data["remotePath"]
+            elif "folderPath" in data:
+                path = data["folderPath"]
 
         if not path:
-            log.warning(f"400 Bad Request: trigger={trigger} content_type={content_type} body={body[:500]}")
+            log.warning(f"400 Bad Request: trigger={trigger} content_type={content_type} body={body[:1000]}")
+            log.warning(f"  data keys: {list(data.keys())}")
             self.send_response(400)
             self.end_headers()
             self.wfile.write(b'{"error": "missing path"}')
             return
+
+        log.info(f"Resolved path: {path}")
 
         log.info(f"Event received trigger={trigger} path={path}")
         process_event(path, trigger)
