@@ -19,6 +19,8 @@ MAX_DELETE="${STRM_PULL_MAX_DELETE:-50000}"
 
 # Max concurrent rclone processes (across all split subdirs)
 MAX_CONCURRENT="${STRM_PULL_MAX_CONCURRENT:-8}"
+MAX_ATTEMPTS="${STRM_PULL_MAX_ATTEMPTS:-3}"
+RETRY_DELAY="${STRM_PULL_RETRY_DELAY:-30}"
 
 exec 9>"$LOCK"
 if ! flock -n 9; then
@@ -76,25 +78,52 @@ run_sync() {
   remote_src="zendrive:strm-tree/$job"
   local_dst="$DST/$job"
 
-  # Run rclone sync
-  /usr/bin/rclone sync "$remote_src" "$local_dst" \
-    --ignore-size --fast-list \
-    --transfers "$TRANSFERS" --checkers "$CHECKERS" \
-    --use-server-modtime \
-    --max-delete "$MAX_DELETE" \
-    --ignore-errors \
-    --exclude "*.partial" \
-    --exclude "*.partial.*" \
-    --exclude ".recyclebin/**" \
-    --exclude ".downloads/**" \
-    --exclude ".inbound/**" \
-    --retries 1 --low-level-retries 3 \
-    --stats 2m --stats-one-line \
-    --log-file "$fifo" --log-level INFO
-  local rc=$?
+  # Run rclone sync with wrapper-level retry for transient failures
+  local max_attempts="${STRM_PULL_MAX_ATTEMPTS:-3}"
+  local retry_delay="${STRM_PULL_RETRY_DELAY:-30}"
+  local attempt=1
+  local rc=0
 
-  # Wait for the sed process to finish flushing
-  wait "$sed_pid" 2>/dev/null
+  while [ "$attempt" -le "$max_attempts" ]; do
+    /usr/bin/rclone sync "$remote_src" "$local_dst" \
+      --ignore-size --fast-list \
+      --transfers "$TRANSFERS" --checkers "$CHECKERS" \
+      --use-server-modtime \
+      --max-delete "$MAX_DELETE" \
+      --ignore-errors \
+      --exclude "*.partial" \
+      --exclude "*.partial.*" \
+      --exclude ".recyclebin/**" \
+      --exclude ".downloads/**" \
+      --exclude ".inbound/**" \
+      --retries 3 --low-level-retries 10 --retries-sleep 5s \
+      --stats 2m --stats-one-line \
+      --log-file "$fifo" --log-level INFO
+    rc=$?
+
+    # Wait for the sed process to finish flushing
+    wait "$sed_pid" 2>/dev/null
+
+    # rc=0 (success) or rc=4 (completed with errors) = done, no retry
+    if [ $rc -eq 0 ] || [ $rc -eq 4 ]; then
+      break
+    fi
+
+    # Hard failure (rc=5, rc=3, etc.) = retry if attempts remain
+    if [ "$attempt" -lt "$max_attempts" ]; then
+      echo "$(date -Is) [$label] FAILED (rc=$rc), retrying in ${retry_delay}s (attempt $attempt/$max_attempts)" >>"$LOG"
+      sleep "$retry_delay"
+      # Recreate the FIFO for the next attempt
+      rm -f "$fifo"
+      mkfifo "$fifo"
+      sed -u "s|^|[$label] |" < "$fifo" >> "$LOG" &
+      sed_pid=$!
+    else
+      echo "$(date -Is) [$label] FAILED (rc=$rc) after $max_attempts attempts" >>"$LOG"
+    fi
+    attempt=$((attempt + 1))
+  done
+
   rm -f "$fifo"
 
   if [ $rc -eq 0 ]; then
@@ -102,8 +131,6 @@ run_sync() {
   elif [ $rc -eq 4 ]; then
     # rc=4 = completed with errors (some files failed, but sync finished)
     echo "$(date -Is) [$label] OK (with errors, rc=$rc)" >>"$LOG"
-  else
-    echo "$(date -Is) [$label] FAILED (rc=$rc)" >>"$LOG"
   fi
 
   return $rc
