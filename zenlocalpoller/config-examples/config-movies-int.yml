@@ -45,7 +45,7 @@ autoscan-servers:
   - /mnt/unionfs/.inbound/
 paths:
   feeder_paths:
-  - source: /media/zen-ceph/movies/int/
+  - source: /media/zen-ceph/movies-int/
     target: /mnt/unionfs/movies-int/
 database:
   path: /state/zenlocalpoller-movies-int.db

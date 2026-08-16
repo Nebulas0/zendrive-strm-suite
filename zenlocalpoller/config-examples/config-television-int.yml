@@ -45,7 +45,7 @@ autoscan-servers:
   - /mnt/unionfs/.inbound/
 paths:
   feeder_paths:
-  - source: /media/zen-ceph/television/int/
+  - source: /media/zen-ceph/television-int/
     target: /mnt/unionfs/television-int/
 database:
   path: /state/zenlocalpoller-television-int.db
