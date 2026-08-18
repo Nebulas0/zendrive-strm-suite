@@ -32,13 +32,12 @@ ExecStart=/usr/bin/rclone mount \
     --dir-cache-time 9999h \
     --fast-list \
     --poll-interval 0 \
-    --no-modtime \
     --rc \
     --rc-addr 127.0.0.1:{{ rclone_remote_port }} \
     --rc-no-auth \
 {% if item.settings.vfs_cache.enabled %}
     --vfs-cache-min-free-space={{ rclone_vfs_cache_min_free_space }} \
-    --vfs-cache-mode full \
+    --vfs-cache-mode minimal \
     --vfs-cache-max-size {{ item.settings.vfs_cache.size | default('300G') }} \
     --vfs-cache-max-age {{ item.settings.vfs_cache.max_age | default('72h') }} \
     --vfs-cache-poll-interval 10s \
@@ -49,7 +48,7 @@ ExecStart=/usr/bin/rclone mount \
     --buffer-size 32M \
     --vfs-read-ahead 128M \
     --vfs-read-chunk-size 4M \
-    --vfs-read-chunk-streams 0 \
+    --vfs-read-chunk-streams 16 \
     --vfs-read-chunk-size-limit 2G \
     -v \
     "{{ rclone_remote_with_path }}" "{{ mount_target }}"
