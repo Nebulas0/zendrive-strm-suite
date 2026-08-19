@@ -119,6 +119,8 @@ refresh_dir() {
       last_progress_time="$now"
     else
       stagnation=$((now - last_progress_time))
+      # Log a heartbeat every check interval so the user can see the refresh is still running
+      log "mount=${mount_name} status=watchdog-heartbeat dir=\"${dir}\" dirs=${cur_dirs} files=${cur_files} elapsed=${elapsed}s stagnation=${stagnation}s"
       if [ "$stagnation" -ge "$WATCHDOG_STAGNATION_SECONDS" ]; then
         # Process is still alive but no stats change — could be re-validating existing entries
         # Log it but don't kill; the process will exit on its own when rclone finishes
@@ -212,7 +214,28 @@ warm_mount() {
     new_dirs_file="/tmp/rclone-precache-newdirs-${name}.$$"
     : >"$new_dirs_file"
 
-    if [ -f "$state_file" ]; then
+    # Detect rclone restart: compare the mount point's mtime with the saved value.
+    # When rclone remounts, the mount point's mtime updates to the current time.
+    # If the mount is newer than our last refresh, rclone was restarted and its
+    # in-memory VFS cache was lost — force a full refresh.
+    mounttime_file="${STATE_DIR}/${name}.mounttime"
+    rclone_restarted=0
+    current_mount_mtime="$(stat -c %Y "$path" 2>/dev/null || echo 0)"
+    if [ -f "$mounttime_file" ]; then
+      saved_mount_mtime="$(cat "$mounttime_file" 2>/dev/null || echo 0)"
+      if [ -n "$saved_mount_mtime" ] && [ "$saved_mount_mtime" -gt 0 ] 2>/dev/null; then
+        if [ "$current_mount_mtime" -gt "$saved_mount_mtime" ]; then
+          log "mount=${name} status=rclone-restart-detected mount_mtime=${current_mount_mtime} saved_mtime=${saved_mount_mtime} forcing-full-refresh"
+          rclone_restarted=1
+        fi
+      fi
+    fi
+
+    if [ "$rclone_restarted" = "1" ]; then
+      # Rclone was restarted — force full refresh of all directories
+      cp "$current_file" "$new_dirs_file"
+      has_state=0
+    elif [ -f "$state_file" ]; then
       # State file exists = previous full recursive refresh was done
       # Only need to check for new top-level directories
       comm -13 "$state_file" "$current_file" >"$new_dirs_file"
@@ -227,9 +250,11 @@ warm_mount() {
     new_count="$(wc -l <"$new_dirs_file" | tr -d ' ')"
     if [ "$new_count" = "0" ]; then
       log "mount=${name} status=up-to-date no-new-directories"
-      rm -f "$current_file" "$new_dirs_file"
-      # Save current state for next run
+      # Save current state for next run (before deleting temp files)
       cp "$current_file" "$state_file" 2>/dev/null || true
+      # Save mount mtime for rclone-restart detection
+      echo "${current_mount_mtime}" > "$mounttime_file" 2>/dev/null || true
+      rm -f "$current_file" "$new_dirs_file"
       return 0
     fi
 
@@ -254,14 +279,17 @@ warm_mount() {
     total_to_refresh="$(wc -l <"$refresh_file" | tr -d ' ')"
     if [ "$total_to_refresh" = "0" ]; then
       log "mount=${name} status=no-new-directories-to-refresh"
-      rm -f "$current_file" "$new_dirs_file" "$refresh_file"
       cp "$current_file" "$state_file" 2>/dev/null || true
+      echo "${current_mount_mtime}" > "$mounttime_file" 2>/dev/null || true
+      rm -f "$current_file" "$new_dirs_file" "$refresh_file"
       return 0
     fi
 
     # Save current state for next run
     cp "$current_file" "$state_file"
     rm -f "$current_file" "$new_dirs_file"
+    # Save mount mtime for rclone-restart detection
+    echo "${current_mount_mtime}" > "$mounttime_file" 2>/dev/null || true
 
     # Fall through to parallel refresh of new directories only
     mount_start="$(date +%s)"
@@ -388,6 +416,9 @@ warm_mount() {
   # Save current top-level directory state for future update detection
   mkdir -p "$STATE_DIR"
   find "$path" -mindepth 1 -maxdepth 1 -type d -print | sort >"${STATE_DIR}/${name}.dirs"
+  # Save mount mtime for rclone-restart detection
+  final_mount_mtime="$(stat -c %Y "$path" 2>/dev/null || echo 0)"
+  echo "${final_mount_mtime}" > "${STATE_DIR}/${name}.mounttime" 2>/dev/null || true
 
   [ "$failed" -eq 0 ]
 }
