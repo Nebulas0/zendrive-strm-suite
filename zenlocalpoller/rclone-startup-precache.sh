@@ -10,6 +10,7 @@ set -eu
 : "${WATCHDOG_CHECK_INTERVAL_SECONDS:=30}"
 : "${KEEP_ALIVE:=true}"
 : "${REFRESH_INTERVAL_SECONDS:=0}"  # 0 = run once; >0 = loop forever
+: "${FULL_REFRESH_INTERVAL_SECONDS:=3600}"  # force full recursive refresh if last one was this long ago
 : "${MOUNT_SPECS:=movies:5572:/mnt/remote/zendrive/movies
 television:5573:/mnt/remote/zendrive/television
 sports:5574:/mnt/remote/zendrive/sports
@@ -231,8 +232,30 @@ warm_mount() {
       fi
     fi
 
-    if [ "$rclone_restarted" = "1" ]; then
-      # Rclone was restarted — force full refresh of all directories
+    # Check if a full recursive refresh is overdue.
+    # Even if no new directories were added, existing dirs may have stale VFS
+    # cache entries (e.g. rclone's in-memory cache was partially evicted, or
+    # files inside existing dirs were renamed/added/removed on the remote).
+    # A periodic full refresh re-validates all entries against S3.
+    fullrefresh_file="${STATE_DIR}/${name}.fullrefresh"
+    full_refresh_overdue=0
+    now_epoch="$(date +%s)"
+    if [ -f "$fullrefresh_file" ]; then
+      last_full_refresh="$(cat "$fullrefresh_file" 2>/dev/null || echo 0)"
+      if [ -n "$last_full_refresh" ] && [ "$last_full_refresh" -gt 0 ] 2>/dev/null; then
+        age=$((now_epoch - last_full_refresh))
+        if [ "$age" -ge "${FULL_REFRESH_INTERVAL_SECONDS}" ]; then
+          log "mount=${name} status=full-refresh-overdue age=${age}s interval=${FULL_REFRESH_INTERVAL_SECONDS}s forcing-full-refresh"
+          full_refresh_overdue=1
+        fi
+      fi
+    else
+      # No fullrefresh file = never done a full refresh, force one
+      full_refresh_overdue=1
+    fi
+
+    if [ "$rclone_restarted" = "1" ] || [ "$full_refresh_overdue" = "1" ]; then
+      # Rclone was restarted OR full refresh is overdue — force full refresh of all directories
       cp "$current_file" "$new_dirs_file"
       has_state=0
     elif [ -f "$state_file" ]; then
@@ -254,6 +277,10 @@ warm_mount() {
       cp "$current_file" "$state_file" 2>/dev/null || true
       # Save mount mtime for rclone-restart detection
       echo "${current_mount_mtime}" > "$mounttime_file" 2>/dev/null || true
+      # Save full-refresh timestamp if we forced one this cycle
+      if [ "$full_refresh_overdue" = "1" ] || [ "$rclone_restarted" = "1" ]; then
+        echo "${now_epoch}" > "$fullrefresh_file" 2>/dev/null || true
+      fi
       rm -f "$current_file" "$new_dirs_file"
       return 0
     fi
@@ -281,6 +308,9 @@ warm_mount() {
       log "mount=${name} status=no-new-directories-to-refresh"
       cp "$current_file" "$state_file" 2>/dev/null || true
       echo "${current_mount_mtime}" > "$mounttime_file" 2>/dev/null || true
+      if [ "$full_refresh_overdue" = "1" ] || [ "$rclone_restarted" = "1" ]; then
+        echo "${now_epoch}" > "$fullrefresh_file" 2>/dev/null || true
+      fi
       rm -f "$current_file" "$new_dirs_file" "$refresh_file"
       return 0
     fi
@@ -290,6 +320,10 @@ warm_mount() {
     rm -f "$current_file" "$new_dirs_file"
     # Save mount mtime for rclone-restart detection
     echo "${current_mount_mtime}" > "$mounttime_file" 2>/dev/null || true
+    # Save full-refresh timestamp if we forced one this cycle
+    if [ "$full_refresh_overdue" = "1" ] || [ "$rclone_restarted" = "1" ]; then
+      echo "${now_epoch}" > "$fullrefresh_file" 2>/dev/null || true
+    fi
 
     # Fall through to parallel refresh of new directories only
     mount_start="$(date +%s)"
@@ -337,6 +371,9 @@ warm_mount() {
     rm -f "$refresh_file"
     total_elapsed=$(($(date +%s) - mount_start))
     log "mount=${name} status=complete-new directories=${total_to_refresh} failed=${failed} elapsed=${total_elapsed}s"
+    if [ "$full_refresh_overdue" = "1" ] || [ "$rclone_restarted" = "1" ]; then
+      echo "${now_epoch}" > "$fullrefresh_file" 2>/dev/null || true
+    fi
     [ "$failed" -eq 0 ]
     return 0
   fi
@@ -419,6 +456,8 @@ warm_mount() {
   # Save mount mtime for rclone-restart detection
   final_mount_mtime="$(stat -c %Y "$path" 2>/dev/null || echo 0)"
   echo "${final_mount_mtime}" > "${STATE_DIR}/${name}.mounttime" 2>/dev/null || true
+  # Save full-refresh timestamp
+  echo "$(date +%s)" > "${STATE_DIR}/${name}.fullrefresh" 2>/dev/null || true
 
   [ "$failed" -eq 0 ]
 }
