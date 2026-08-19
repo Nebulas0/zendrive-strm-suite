@@ -52,7 +52,7 @@ ExecStart=/usr/bin/rclone mount \
     --vfs-read-chunk-size-limit 2G \
     -v \
     "{{ rclone_remote_with_path }}" "{{ mount_target }}"
-ExecStartPost=/bin/true
+ExecStartPost=/bin/sh -c 'sleep 5 && for d in {{ mount_target }}/*/; do /usr/bin/rclone rc vfs/refresh dir="$$(basename "$$d")" recursive=false _async=true --rc-addr 127.0.0.1:{{ rclone_remote_port }}; done'
 ExecStop=/bin/fusermount3 -uz "{{ mount_target }}"
 ExecStopPost=/bin/umount -l "{{ mount_target }}"
 TimeoutStopSec=20
