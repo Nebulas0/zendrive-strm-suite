@@ -10,7 +10,7 @@ set -eu
 : "${WATCHDOG_CHECK_INTERVAL_SECONDS:=30}"
 : "${KEEP_ALIVE:=true}"
 : "${REFRESH_INTERVAL_SECONDS:=0}"  # 0 = run once; >0 = loop forever
-: "${FULL_REFRESH_INTERVAL_SECONDS:=3600}"  # force full recursive refresh if last one was this long ago
+: "${FULL_REFRESH_INTERVAL_SECONDS:=21600}"  # force full recursive refresh if last one was this long ago
 : "${MOUNT_SPECS:=movies:5572:/mnt/remote/zendrive/movies
 television:5573:/mnt/remote/zendrive/television
 sports:5574:/mnt/remote/zendrive/sports
