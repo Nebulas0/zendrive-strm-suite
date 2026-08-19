@@ -47,7 +47,7 @@ ExecStart=/usr/bin/rclone mount \
 {% endif %}
     --buffer-size 32M \
     --vfs-read-ahead 128M \
-    --vfs-read-chunk-size 4M \
+    --vfs-read-chunk-size 64M \
     --vfs-read-chunk-streams 16 \
     --vfs-read-chunk-size-limit 2G \
     -v \
